@@ -19,7 +19,7 @@ Usage example:
 
 ```bash
 cd data_generation
-python main.py /path/to/videos -o /path/to/output -w 640 -h 480 -r 5
+python main.py /path/to/videos -o /path/to/output
 ```
 
 See [data_generation/README.md](data_generation/README.md) for more details.
