@@ -1,14 +1,15 @@
 import argparse
 from video_to_frames import VideoToFrames
+from config import DEFAULT_RESOLUTION, DEFAULT_SAMPLING_RATE, OUTPUT_DATASET_DIR
 
 def main():
     parser = argparse.ArgumentParser(description="Convert videos to image frame datasets")
     
     parser.add_argument("input", help="Input video file or directory containing videos")
-    parser.add_argument("-o", "--output", help="Output directory path (default: ./dataset)")
-    parser.add_argument("--width", type=int, default=640, help="Output image width (default: 640)")
-    parser.add_argument("--height", type=int, default=480, help="Output image height (default: 480)")
-    parser.add_argument("-r", "--rate", type=float, default=5, help="Sampling rate (frames per second, default: 5)")
+    parser.add_argument("-o", "--output", help=f"Output directory path (default: ./{OUTPUT_DATASET_DIR})", default=OUTPUT_DATASET_DIR)
+    parser.add_argument("--width", type=int, default=DEFAULT_RESOLUTION[0], help=f"Output image width (default: {DEFAULT_RESOLUTION[0]})")
+    parser.add_argument("--height", type=int, default=DEFAULT_RESOLUTION[1], help=f"Output image height (default: {DEFAULT_RESOLUTION[1]})")
+    parser.add_argument("-r", "--rate", type=float, default=DEFAULT_SAMPLING_RATE, help=f"Sampling rate (frames per second, default: {DEFAULT_SAMPLING_RATE})")
     
     args = parser.parse_args()
     

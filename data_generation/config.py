@@ -3,7 +3,7 @@ Configuration file containing default parameters for video processing and frame 
 """
 
 # Default output image resolution
-DEFAULT_RESOLUTION = (640, 480)  # width x height
+DEFAULT_RESOLUTION = (1280, 720)  # width x height
 
 # Default sampling rate (frames per second)
 DEFAULT_SAMPLING_RATE = 5
