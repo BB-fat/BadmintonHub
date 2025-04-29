@@ -41,8 +41,7 @@ def detect_shuttlecocks(video_path, output_path, device="cuda"):
     print(f"使用设备: {device}")
     
     print(f"正在加载SAM2模型...")
-    predictor = SAM2VideoPredictor.from_pretrained("facebook/sam2-hiera-large")
-    predictor.to(device)
+    predictor = SAM2VideoPredictor.from_pretrained("facebook/sam2-hiera-large", device=device)
     
     # 确定输出目录存在
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
