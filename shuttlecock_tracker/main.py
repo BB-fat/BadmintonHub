@@ -23,7 +23,7 @@ def get_available_device(requested_device="cuda"):
     else:
         return "cpu"
 
-def detect_shuttlecocks(video_path, device="cuda", window_size=60, overlap=10):
+def detect_shuttlecocks(video_path, device="cuda", window_size=60):
     """
     使用SAM2模型检测和追踪羽毛球视频中的羽毛球。
     使用滑动窗口技术处理视频，避免MPS后端的NDArray大小限制。
@@ -32,7 +32,6 @@ def detect_shuttlecocks(video_path, device="cuda", window_size=60, overlap=10):
         video_path (str): 输入羽毛球视频的路径
         device (str): 使用的设备，默认为"cuda"
         window_size (int): 滑动窗口的帧数，默认为60帧
-        overlap (int): 窗口之间的重叠帧数，默认为10帧
     """
     # 检查可用设备
     actual_device = get_available_device(device)
@@ -109,13 +108,13 @@ def detect_shuttlecocks(video_path, device="cuda", window_size=60, overlap=10):
                 cap = cv2.VideoCapture(temp_video_path)
                 if not cap.isOpened():
                     print(f"错误：无法打开视频文件 {temp_video_path}")
-                    start_frame = end_frame - overlap
+                    start_frame = end_frame
                     continue
                 
                 ret, frame = cap.read()
                 if not ret:
                     print(f"错误：无法读取视频文件 {temp_video_path}")
-                    start_frame = end_frame - overlap
+                    start_frame = end_frame
                     continue
                 
                 # 添加初始框或使用上一个窗口的边界框
@@ -204,7 +203,7 @@ def detect_shuttlecocks(video_path, device="cuda", window_size=60, overlap=10):
                     os.remove(temp_video_path)
         
         # 移动到下一个窗口，保留一些重叠以确保平滑过渡
-        start_frame = end_frame - overlap
+        start_frame = end_frame
     
     cv2.destroyAllWindows()
 
@@ -253,8 +252,6 @@ def main():
                         help="使用的设备 (cuda/mps/cpu)，将自动检测可用性")
     parser.add_argument("--window-size", type=int, default=60,
                         help="滑动窗口的帧数，默认为60")
-    parser.add_argument("--overlap", type=int, default=10,
-                        help="窗口之间的重叠帧数，默认为10")
     
     args = parser.parse_args()
     
@@ -262,7 +259,7 @@ def main():
         print(f"错误：输入视频 {args.input} 不存在")
         return
 
-    detect_shuttlecocks(args.input, args.device, args.window_size, args.overlap)
+    detect_shuttlecocks(args.input, args.device, args.window_size)
 
 if __name__ == "__main__":
     main() 
