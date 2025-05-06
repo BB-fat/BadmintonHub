@@ -42,6 +42,7 @@ def detect_shuttlecocks(video_path, output_path, device="cuda"):
     
     print(f"正在加载SAM2模型...")
     predictor = SAM2VideoPredictor.from_pretrained("facebook/sam2-hiera-large", device=device)
+    predictor.to(device=device)
     
     # 确定输出目录存在
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -55,14 +56,18 @@ def detect_shuttlecocks(video_path, output_path, device="cuda"):
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     cap.release()
+
+    print(f"视频帧率: {fps}, 宽度: {width}, 高度: {height}, 帧数: {frame_count}")
     
     # 设置输出视频编码器
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
     
-    with torch.inference_mode(), torch.autocast(device_type=device, dtype=torch.float32 if device == "cpu" else torch.bfloat16):
+    with torch.inference_mode(), torch.autocast(device_type=device, dtype=torch.bfloat16):
         # 初始化SAM2状态
         state = predictor.init_state(video_path)
+
+        print(f"初始化SAM2状态完成")
         
         # 获取第一帧并初始化追踪
         first_frame_idx = 0
@@ -100,29 +105,41 @@ def detect_shuttlecocks(video_path, output_path, device="cuda"):
         )
         
         # 显示初始化结果
-        frame_with_mask = visualize_mask(state["images"][first_frame_idx].cpu().numpy(), masks.cpu().numpy())
+        frame = state["images"][first_frame_idx].cpu().numpy()
+        # 确保帧是uint8类型
+        if frame.dtype != np.uint8:
+            frame = (frame * 255).astype(np.uint8)
+        frame_with_mask = visualize_mask(frame, masks.cpu().numpy())
         
         # 添加羽毛球位置标记
-        cv2.circle(frame_with_mask, (center_x, center_y), radius, (0, 255, 0), 2)
-        cv2.rectangle(
-            frame_with_mask, 
-            (box[0], box[1]), 
-            (box[2], box[3]), 
-            (255, 255, 0), 
-            2
-        )
+        # 绘制边界框
+        cv2.rectangle(frame_with_mask, 
+                     (box[0], box[1]), 
+                     (box[2], box[3]), 
+                     (0, 255, 0), 2)
         
-        out.write(cv2.cvtColor(frame_with_mask, cv2.COLOR_RGB2BGR))
+        # 确保帧是BGR格式和uint8类型以便写入
+        out_frame = cv2.cvtColor(frame_with_mask, cv2.COLOR_RGB2BGR)
+        if out_frame.dtype != np.uint8:
+            out_frame = out_frame.astype(np.uint8)
+        out.write(out_frame)
+        
         print(f"初始化追踪成功，开始追踪视频中的羽毛球...")
         
         # 在整个视频中传播掩码（追踪羽毛球）
         for frame_idx, object_ids, masks in predictor.propagate_in_video(state):
             # 转换为NumPy数组并可视化
             frame = state["images"][frame_idx].cpu().numpy()
+            # 确保帧是uint8类型
+            if frame.dtype != np.uint8:
+                frame = (frame * 255).astype(np.uint8)
             frame_with_mask = visualize_mask(frame, masks.cpu().numpy())
             
-            # 保存帧
-            out.write(cv2.cvtColor(frame_with_mask, cv2.COLOR_RGB2BGR))
+            # 确保帧是BGR格式和uint8类型以便写入
+            out_frame = cv2.cvtColor(frame_with_mask, cv2.COLOR_RGB2BGR)
+            if out_frame.dtype != np.uint8:
+                out_frame = out_frame.astype(np.uint8)
+            out.write(out_frame)
             
             # 显示进度
             print(f"处理帧: {frame_idx+1}/{frame_count}", end="\r")
@@ -141,32 +158,42 @@ def visualize_mask(frame, masks):
     Returns:
         带有掩码的帧
     """
-    # 确保frame是RGB格式并且值在0-255范围内
-    frame = (frame * 255).astype(np.uint8) if frame.max() <= 1.0 else frame.astype(np.uint8)
+    # 确保帧是uint8类型
+    if frame.dtype != np.uint8:
+        frame = (frame * 255).astype(np.uint8)
     
-    # 创建一个彩色掩码覆盖层
-    color_mask = np.zeros_like(frame)
+    # 创建帧的副本以避免修改原始数据
+    frame_with_mask = frame.copy()
     
-    # 使用明亮的颜色表示羽毛球
-    color = [255, 0, 0]  # 红色
+    # 如果没有掩码，直接返回原始帧
+    if masks is None or len(masks) == 0:
+        return frame_with_mask
     
-    # 将掩码应用到颜色层
-    for i in range(3):
-        color_mask[:, :, i] = color[i] * masks[0]
+    # 处理掩码 - 采用最简单的方法避免维度问题
+    if len(masks) > 0:
+        # 获取第一个掩码并确保它是2D的
+        mask = masks[0]
+        if mask.ndim > 2:
+            mask = mask[:, :, 0]
+        
+        # 转为二值掩码并匹配图像尺寸
+        height, width = frame.shape[:2]
+        binary_mask = cv2.resize((mask > 0.5).astype(np.uint8), (width, height))
+        
+        # 在原图上直接用颜色覆盖掩码区域
+        yellow = [0, 255, 255]  # BGR格式的黄色
+        
+        # 创建遮罩 - 在掩码区域使用黄色
+        overlay = np.zeros_like(frame_with_mask)
+        for i in range(3):  # 遍历BGR通道
+            overlay[:, :, i] = binary_mask * yellow[i]
+        
+        # 混合原图和掩码
+        alpha = 0.4  # 透明度
+        cv2.addWeighted(frame_with_mask, 1.0, overlay, alpha, 0, frame_with_mask)
     
-    # 将掩码与原始帧混合
-    alpha = 0.5  # 透明度
-    frame_with_mask = cv2.addWeighted(frame, 1, color_mask, alpha, 0)
-    
-    # 在检测到的羽毛球位置绘制轮廓
-    contours, _ = cv2.findContours(
-        (masks[0] * 255).astype(np.uint8), 
-        cv2.RETR_EXTERNAL, 
-        cv2.CHAIN_APPROX_SIMPLE
-    )
-    cv2.drawContours(frame_with_mask, contours, -1, (0, 255, 0), 2)  # 绿色轮廓
-    
-    return frame_with_mask
+    # 确保返回的帧是uint8类型
+    return frame_with_mask.astype(np.uint8)
 
 def main():
     parser = argparse.ArgumentParser(description="羽毛球检测和追踪工具")
