@@ -10,7 +10,7 @@ from datetime import datetime
 
 from config import (
     DEFAULT_RESOLUTION,
-    DEFAULT_SAMPLING_RATE,
+    DEFAULT_SAMPLING_INTERVAL,
     OUTPUT_DATASET_DIR,
     SUPPORTED_VIDEO_FORMATS,
     OUTPUT_IMAGE_FORMAT,
@@ -26,7 +26,7 @@ class VideoToFrames:
         input_path, 
         output_path=None, 
         resolution=DEFAULT_RESOLUTION, 
-        sampling_rate=DEFAULT_SAMPLING_RATE
+        sampling_interval=DEFAULT_SAMPLING_INTERVAL
     ):
         """
         Initialize video processor
@@ -35,12 +35,12 @@ class VideoToFrames:
             input_path (str): Input video file or directory containing videos
             output_path (str, optional): Output directory path
             resolution (tuple, optional): Output image resolution as (width, height)
-            sampling_rate (float, optional): Frames to sample per second
+            sampling_interval (int, optional): Milliseconds between frames
         """
         self.input_path = input_path
         self.output_path = output_path or os.path.join(os.getcwd(), OUTPUT_DATASET_DIR)
         self.resolution = resolution
-        self.sampling_rate = sampling_rate
+        self.sampling_interval = sampling_interval
         
         # Create output directory
         os.makedirs(self.output_path, exist_ok=True)
@@ -99,15 +99,16 @@ class VideoToFrames:
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         duration = total_frames / fps if fps > 0 else 0
         
-        # Calculate sampling interval
-        sample_interval = max(1, int(fps / self.sampling_rate))
-        expected_frames = total_frames // sample_interval
+        # Calculate sampling interval in frames
+        # Convert milliseconds to frames: interval_ms / (1000 / fps)
+        frame_interval = max(1, int((self.sampling_interval / 1000) * fps))
+        expected_frames = total_frames // frame_interval
         
         self.log(f"Processing video: {video_path}")
         self.log(f"  - Frame rate: {fps:.2f} fps")
         self.log(f"  - Total frames: {total_frames}")
         self.log(f"  - Duration: {duration:.2f} seconds")
-        self.log(f"  - Sampling interval: every {sample_interval} frames")
+        self.log(f"  - Sampling interval: {self.sampling_interval} ms (every {frame_interval} frames)")
         self.log(f"  - Estimated output frames: ~{expected_frames}")
         
         # Extract frames
@@ -122,7 +123,7 @@ class VideoToFrames:
                     break
                 
                 # Extract frames according to sampling interval
-                if frame_count % sample_interval == 0:
+                if frame_count % frame_interval == 0:
                     # Adjust resolution
                     if self.resolution:
                         frame = cv2.resize(frame, self.resolution)
@@ -152,7 +153,7 @@ class VideoToFrames:
         self.log(f"Found {len(video_files)} video files")
         self.log(f"Output path: {self.output_path}")
         self.log(f"Output resolution: {self.resolution}")
-        self.log(f"Sampling rate: {self.sampling_rate} fps")
+        self.log(f"Sampling interval: {self.sampling_interval} ms")
         
         total_frames = 0
         
@@ -169,7 +170,7 @@ class VideoToFrames:
             f.write(f"Processed video files: {len(video_files)}\n")
             f.write(f"Total frames: {total_frames}\n")
             f.write(f"Resolution: {self.resolution}\n")
-            f.write(f"Sampling rate: {self.sampling_rate} fps\n")
+            f.write(f"Sampling interval: {self.sampling_interval} ms\n")
             f.write("\n--- Video List ---\n")
             for video in video_files:
                 f.write(f" - {os.path.basename(video)}\n")
