@@ -5,25 +5,18 @@ import torch
 from sam2.sam2_video_predictor import SAM2VideoPredictor
 import argparse
 from shuttlecock_detector import detect_shuttlecock_sequence
-
-def get_available_device(requested_device="cuda"):
-    """
-    检查并返回可用的设备
     
-    Args:
-        requested_device (str): 请求使用的设备
-    
-    Returns:
-        str: 可用的设备名称
-    """
-    if requested_device == "cuda" and torch.cuda.is_available():
-        return "cuda"
-    elif requested_device == "mps" and hasattr(torch, "mps") and torch.backends.mps.is_available():
-        return "mps"
+def is_device_available(device):
+    if device == "cuda" and torch.cuda.is_available():
+        return True
+    elif device == "mps" and hasattr(torch, "mps") and torch.backends.mps.is_available():
+        return True
+    elif device == "cpu":
+        return True
     else:
-        return "cpu"
+        return False
 
-def detect_shuttlecocks(video_path, device="cuda", window_size=60):
+def detect_shuttlecocks(video_path, device, window_size=60):
     """
     使用SAM2模型检测和追踪羽毛球视频中的羽毛球。
     使用滑动窗口技术处理视频，避免MPS后端的NDArray大小限制。
@@ -34,18 +27,15 @@ def detect_shuttlecocks(video_path, device="cuda", window_size=60):
         window_size (int): 滑动窗口的帧数，默认为60帧
     """
     # 检查可用设备
-    actual_device = get_available_device(device)
-    if actual_device != device:
-        print(f"警告：请求的设备 '{device}' 不可用，切换到 '{actual_device}'")
+    if not is_device_available(device):
+        print(f"错误：设备 '{device}' 不可用")
+        return
     
-    device = actual_device
     print(f"使用设备: {device}")
     
     print(f"正在加载SAM2模型...")
     predictor = SAM2VideoPredictor.from_pretrained("facebook/sam2-hiera-small", device=device)
     predictor.to(device=device)
-    
-    print(f"正在处理视频: {video_path}")
     
     # 读取输入视频以获取帧率和尺寸等信息
     cap = cv2.VideoCapture(video_path)
@@ -64,10 +54,8 @@ def detect_shuttlecocks(video_path, device="cuda", window_size=60):
         center_x, center_y, radius = shuttlecock_pos
         print(f"检测到羽毛球位置: 中心=({center_x}, {center_y}), 半径={radius}")
     else:
-        # 使用默认位置
-        center_x, center_y = width // 2, height // 2
-        radius = 30
-        print(f"未检测到羽毛球，使用默认位置: 中心=({center_x}, {center_y}), 半径={radius}")
+        print("未检测到羽毛球")
+        return
     
     # 创建边界框 [x1, y1, x2, y2]
     # 使用稍大的半径以确保羽毛球完全在框内
@@ -163,7 +151,6 @@ def detect_shuttlecocks(video_path, device="cuda", window_size=60):
                                 y_max = min(height, y_max + padding)
                                 
                                 final_box = [int(x_min), int(y_min), int(x_max), int(y_max)]
-                                print(f"最后一帧的边界框: {final_box}")
                         
                         # 创建彩色遮罩 (红色)
                         colored_mask = np.zeros_like(frame)
@@ -183,26 +170,20 @@ def detect_shuttlecocks(video_path, device="cuda", window_size=60):
                                 cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
                     
                     cv2.imshow("Shuttlecock Detection", frame)
-                    key = cv2.waitKey(30)
-                    if key == 27:  # ESC键 - 停止处理
-                        break
+                    cv2.waitKey(1)
                 
                 # 更新last_box为当前窗口的最后一帧边界框
                 if final_box is not None:
                     last_box = final_box
                 
                 cap.release()
-                
-                # 如果用户按ESC键停止处理，则退出整个循环
-                if key == 27:
-                    break
-                    
+                                    
             finally:
                 # 清理临时文件
                 if os.path.exists(temp_video_path):
                     os.remove(temp_video_path)
         
-        # 移动到下一个窗口，保留一些重叠以确保平滑过渡
+        # 移动到下一个窗口
         start_frame = end_frame
     
     cv2.destroyAllWindows()
@@ -248,7 +229,7 @@ def extract_video_segment(input_video, output_video, start_frame, end_frame, fps
 def main():
     parser = argparse.ArgumentParser(description="羽毛球检测和追踪工具")
     parser.add_argument("--input", type=str, required=True, help="输入视频路径")
-    parser.add_argument("--device", type=str, default="cuda", 
+    parser.add_argument("--device", type=str, default="cpu", 
                         help="使用的设备 (cuda/mps/cpu)，将自动检测可用性")
     parser.add_argument("--window-size", type=int, default=60,
                         help="滑动窗口的帧数，默认为60")
