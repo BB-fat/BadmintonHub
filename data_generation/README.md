@@ -1,12 +1,12 @@
 # Badminton Training Data Generation Module
 
-This module is used to convert video files into image frame datasets for training deep learning models. It can process a single video file or a directory containing multiple videos, and extract frames at a configurable frequency.
+This module is used to convert video files into image frame datasets for training deep learning models. It can process a single video file or a directory containing multiple videos, and extract frames at a configurable interval.
 
 ## Features
 
 - Support for multiple video formats (.mp4, .avi, .mov, .mkv)
 - Configurable output image resolution
-- Configurable sampling rate (frames extracted per second)
+- Configurable sampling interval (milliseconds between frames)
 - Generate detailed processing logs and metadata
 
 ## Installing Dependencies
@@ -36,9 +36,9 @@ python main.py /path/to/videos -o /path/to/output
 Parameter description:
 - `input`: Input video file or directory containing videos (required)
 - `-o, --output`: Output directory path (optional, default: ./dataset)
-- `--width`: Output image width (optional, default: 640)
-- `--height`: Output image height (optional, default: 480)
-- `-r, --rate`: Sampling rate, frames per second (optional, default: 5)
+- `--width`: Output image width (optional, default: 1920)
+- `--height`: Output image height (optional, default: 1080)
+- `-i, --interval`: Sampling interval in milliseconds (optional, default: 1000)
 
 ### Using as a Module
 
@@ -49,8 +49,8 @@ from video_to_frames import VideoToFrames
 processor = VideoToFrames(
     input_path="/path/to/videos",
     output_path="/path/to/output",
-    resolution=(640, 480),
-    sampling_rate=5
+    resolution=(1920, 1080),
+    sampling_interval=1000
 )
 
 # Process all videos

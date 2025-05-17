@@ -5,8 +5,8 @@ Configuration file containing default parameters for video processing and frame 
 # Default output image resolution
 DEFAULT_RESOLUTION = (1920, 1080)  # width x height
 
-# Default sampling rate (frames per second)
-DEFAULT_SAMPLING_RATE = 5
+# Default sampling interval in milliseconds (time between frames)
+DEFAULT_SAMPLING_INTERVAL = 1000  # ms
 
 # Output dataset directory
 OUTPUT_DATASET_DIR = "dataset"
